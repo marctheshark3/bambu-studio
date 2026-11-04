@@ -29,7 +29,9 @@ accepts STL and OBJ, not a 3MF as an object path.
 
 Keep `need_arrange` false. The planner's positions are the placement. Studio
 arrange can move or rotate a part after the fit check. Keep `count` at 1 and
-do not set `assemble_index`; a non-zero index merges objects into one body.
+do not set `assemble_index` for independently printed parts. The optional material
+workflow deliberately uses a shared non-zero index to preserve material regions
+as native parts of one printed body; do not independently repack those regions.
 
 `filaments` uses Studio's 1-based filament slot. A one-material review uses
 `[1]`. Pass the machine, process, and filament JSON for the named printer.
@@ -71,3 +73,14 @@ returns empty `close` and `click` lists. Leave that dialog for the user.
 Uploading, slicing to G-code, and starting a job belong to the sibling
 `bambu-p1s-mcp` tools. Write tools there require confirmation. This package
 does not store a printer address or login secret.
+
+## Multiple project filaments
+
+Repeat `--filament` on `plan_project.py argv` in logical filament order. The
+script joins the paths for Studio's `--load-filaments` argument. These project
+filament numbers do not identify the currently loaded physical AMS slots.
+
+Studio combines `--export-3mf` with `--outputdir`, so the generated export argv
+uses the 3MF basename. A specified 3MF parent must equal the output directory.
+`check-3mf` requires printable geometry as well as a build item; a success exit
+or a ZIP header alone does not establish that a project contains its models.

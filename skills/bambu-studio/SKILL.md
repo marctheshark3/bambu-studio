@@ -1,7 +1,7 @@
 ---
 name: bambu-studio
 description: "This skill should be used when the user asks to \"pull it up on bambu\", \"open in Bambu Studio\", \"one Studio project\", \"put these on plates\", or \"show me the plate\". It builds one unsliced multi-plate project with the Studio CLI. Not part design, not 3d-print-slice, and not a printer start."
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Bambu Studio
@@ -25,6 +25,30 @@ its write tools stay behind confirmation.
 
 A request to send, upload, or start the print ends this skill. Do not click
 Send in a window that is already open.
+
+## Material-aware projects
+
+When `PRINT_SPEC.multi_material` is present, use the installed
+`3d-print-multi-material` / `3d-print-slice` export path with explicit local
+profiles and no `--slice`. It preserves region alignment, logical filament ids,
+support-interface assignments and verifies the actual 3MF. Open the resulting
+`slice/project.3mf` as one project, run the normal unsliced check, and render
+every plate. Do not feed those region STLs to the independent-part packer below:
+that would move each material region independently. Physical AMS slots are
+chosen from the loaded spools at job setup.
+
+For a provided native material assemble list, `argv` accepts repeated
+`--filament` arguments in project-filament order. The ordinary one-profile
+invocation stays valid. Native `assemble_index` groups are intentional only
+when they came from the validated material plan. Keep them intact. The material
+workflow's checker must verify geometry, colors and assignments as well as
+this package's unsliced check.
+
+The local CLI needs resolved presets and a working graphics context even for
+export. Resolve inherited presets through the material exporter when using
+that workflow. Do not add `--min-save`: it can produce a successful export
+with no model geometry. Report an export/render failure instead of delivering
+an empty project.
 
 ## Workflow
 
