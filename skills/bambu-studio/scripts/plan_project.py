@@ -302,17 +302,20 @@ def assemble_list(plan: dict, out_dir: Path) -> dict:
     return {"plates": plates}
 
 
-def export_argv(slicer: str, assemble: Path, out_3mf: Path, output_dir: Path, machine: Path, process: Path, filament: Path) -> list[str]:
+def export_argv(slicer: str, assemble: Path, out_3mf: Path, output_dir: Path, machine: Path, process: Path, filament: Path | list[Path]) -> list[str]:
+    filaments = filament if isinstance(filament, list) else [filament]
+    if out_3mf.parent != Path(".") and out_3mf.parent.resolve() != output_dir.resolve():
+        raise PlanError("--out-3mf must be inside --outputdir")
     argv = [
         slicer,
         "--load-settings",
         f"{machine};{process}",
         "--load-filaments",
-        str(filament),
+        ";".join(str(path) for path in filaments),
         "--load-assemble-list",
         str(assemble),
         "--export-3mf",
-        str(out_3mf),
+        out_3mf.name,
         "--outputdir",
         str(output_dir),
     ]
@@ -367,6 +370,7 @@ def guard_argv(argv: list[str]) -> None:
 
 def check_3mf(path: Path) -> dict:
     import zipfile
+    from xml.etree import ElementTree as ET
 
     if not zipfile.is_zipfile(path):
         raise PlanError(f"not a 3MF zip: {path}")
@@ -377,6 +381,15 @@ def check_3mf(path: Path) -> dict:
             raise PlanError("sliced gcode found; this skill only opens unsliced projects: " + ", ".join(gcode))
         if "3D/3dmodel.model" not in names:
             raise PlanError("3MF is missing 3D/3dmodel.model")
+        try:
+            model = ET.fromstring(archive.read("3D/3dmodel.model"))
+            if model.find(".//{*}build/{*}item") is None or not any(
+                ET.fromstring(archive.read(name)).find(".//{*}triangle") is not None
+                for name in names if name.startswith("3D/") and name.endswith(".model")
+            ):
+                raise PlanError("3MF has no printable geometry; do not use --min-save")
+        except ET.ParseError as error:
+            raise PlanError("3MF model XML is invalid") from error
         plates = 0
         if "Metadata/model_settings.config" in names:
             text = archive.read("Metadata/model_settings.config").decode("utf-8", errors="replace")
@@ -432,7 +445,7 @@ def _write_argv(args) -> int:
             Path(args.outputdir),
             Path(args.machine),
             Path(args.process),
-            Path(args.filament),
+            [Path(path) for path in args.filament],
         ),
         "open": open_argv(args.slicer, Path(args.out_3mf)),
         "proof": proof_argv(args.slicer, Path(args.out_3mf), Path(args.outputdir) / "proof"),
@@ -462,7 +475,7 @@ def main(argv: list[str] | None = None) -> int:
     build.add_argument("--outputdir", required=True)
     build.add_argument("--machine", required=True)
     build.add_argument("--process", required=True)
-    build.add_argument("--filament", required=True)
+    build.add_argument("--filament", required=True, action="append")
     build.set_defaults(func=_write_argv)
 
     check = sub.add_parser("check-3mf")

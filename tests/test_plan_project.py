@@ -182,13 +182,28 @@ class PlanTests(unittest.TestCase):
             raw = Path(tmp) / "raw.3mf"
             sliced = Path(tmp) / "sliced.3mf"
             with zipfile.ZipFile(raw, "w") as archive:
-                archive.writestr("3D/3dmodel.model", "<model/>")
+                archive.writestr("3D/3dmodel.model", '<model><resources><object id="1"><mesh><triangles><triangle v1="0" v2="1" v3="2"/></triangles></mesh></object></resources><build><item objectid="1"/></build></model>')
             with zipfile.ZipFile(sliced, "w") as archive:
                 archive.writestr("3D/3dmodel.model", "<model/>")
                 archive.writestr("Metadata/plate_1.gcode", "G1")
             self.assertTrue(plan_project.check_3mf(raw)["unsliced"])
             with self.assertRaises(plan_project.PlanError):
                 plan_project.check_3mf(sliced)
+
+    def test_multiple_filament_profiles_and_export_directory(self):
+        argv = plan_project.export_argv("studio", Path("list.json"), Path("out/project.3mf"),
+                                        Path("out"), Path("machine.json"), Path("process.json"),
+                                        [Path("green.json"), Path("cream.json")])
+        self.assertEqual(argv[argv.index("--load-filaments") + 1], "green.json;cream.json")
+        self.assertEqual(argv[argv.index("--export-3mf") + 1], "project.3mf")
+
+    def test_empty_successful_export_is_not_a_project(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "empty.3mf"
+            with zipfile.ZipFile(path, "w") as archive:
+                archive.writestr("3D/3dmodel.model", "<model><resources/><build/></model>")
+            with self.assertRaisesRegex(plan_project.PlanError, "no printable geometry"):
+                plan_project.check_3mf(path)
 
 
 class WindowTests(unittest.TestCase):
