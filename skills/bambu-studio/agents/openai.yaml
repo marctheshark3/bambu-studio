@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bambu Studio"
+  short_description: "Open one unsliced multi-plate Studio project"
+  default_prompt: "Use $bambu-studio to put these meshes in one unsliced Bambu Studio project, pack plates only when they fit, and show the plates without sending a print."
